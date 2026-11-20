@@ -13,7 +13,7 @@ const CLUBS = [
   ['Redcliffe', 'RDC'], ['Stanmore', 'STN'], ['Thornbury', 'THB'], ['Westbrook Wanderers', 'WBW'],
 ];
 const FIRST = ['Alex', 'Ben', 'Caleb', 'Dan', 'Eli', 'Femi', 'George', 'Harvey', 'Isaac', 'Jonah', 'Kian', 'Leo', 'Marco', 'Nico', 'Oscar', 'Pablo', 'Rafa', 'Sami', 'Theo', 'Victor', 'Wes', 'Yusuf', 'Zak', 'Ade', 'Bruno', 'Cian', 'Dario', 'Emil', 'Finn', 'Hugo'];
-const LAST = ['Adeyemi', 'Barker', 'Castell', 'Doyle', 'Ekwueme', 'Fischer', 'Garnett', 'Holloway', 'Ibsen', 'Jansen', 'Kovac', 'Lindqvist', 'Moreau', 'Nakamura', 'Okafor', 'Pereira', 'Quinn', 'Rossi', 'Silva', 'Thorne', 'Ulloa', 'Vance', 'Whitlock', 'Yilmaz', 'Zielinski', 'Abara', 'Brennan', 'Costa', 'Dlamini', 'Eriksen', 'Ferro', 'Gallo', 'Haaland', 'Iwobi', 'Jurić', 'Kane', 'Lemaire', 'Mendy', 'Novak', 'Ortega'];
+const LAST = ['Adeyemi', 'Barker', 'Castell', 'Doyle', 'Ekwueme', 'Fischer', 'Garnett', 'Holloway', 'Ibsen', 'Jansen', 'Kovac', 'Lindqvist', 'Moreau', 'Nakamura', 'Okafor', 'Pereira', 'Quinn', 'Rossi', 'Silva', 'Thorne', 'Ulloa', 'Vance', 'Whitlock', 'Yilmaz', 'Zielinski', 'Abara', 'Brennan', 'Costa', 'Dlamini', 'Eklund', 'Ferro', 'Gallo', 'Hartley', 'Ikande', 'Jurić', 'Kinsella', 'Lemaire', 'Mensah', 'Novak', 'Ortega'];
 const SQUAD_SHAPE = { 1: 3, 2: 8, 3: 9, 4: 4 };
 const PRICE = { 1: [40, 60], 2: [40, 70], 3: [45, 135], 4: [45, 150] };
 const CURRENT_EVENT = 12;
