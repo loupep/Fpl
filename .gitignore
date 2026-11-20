@@ -1,0 +1,5 @@
+node_modules/
+.fpl-session.json
+*.log
+.DS_Store
+test-results/
