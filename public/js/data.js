@@ -66,7 +66,7 @@ export async function loadTeam(session, d) {
       transfers: { limit: mt.transfers?.limit ?? null, made: mt.transfers?.made ?? 0, cost: mt.transfers?.cost ?? 4, status: mt.transfers?.status ?? null },
       bank: mt.transfers?.bank ?? entry?.last_deadline_bank ?? 0,
       value: mt.transfers?.value ?? null,
-      activeChip: chips.find((c) => c.status_for_entry === 'active')?.name ?? null,
+      activeChip: chips.find((c) => c.status_for_entry === 'active' && c.is_pending !== false)?.name ?? null,
     };
   }
   const gw = entry?.current_event ?? d.current?.id;

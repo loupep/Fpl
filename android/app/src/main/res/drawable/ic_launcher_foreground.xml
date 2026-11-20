@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A football shirt, kept inside the adaptive icon's safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44.55,32.4 L32.4,39.83 L37.13,50.63 L42.53,47.93 L42.53,75.6 L65.48,75.6 L65.48,47.93 L70.88,50.63 L75.6,39.83 L63.45,32.4 Q59.4,37.8 54,37.8 Q48.6,37.8 44.55,32.4 Z" />
+    <path
+        android:fillColor="#0D1217"
+        android:pathData="M48.6,56.7 L59.4,56.7 L59.4,59.4 L48.6,59.4 Z" />
+</vector>

@@ -30,8 +30,8 @@ export function countdown(iso, now = Date.now()) {
 // derived from its name.
 const CLUB_COLOURS = {
   ARS: ['#e30613', '#ffffff'], AVL: ['#7a003c', '#94bee5'], BOU: ['#da291c', '#111111'], BRE: ['#e30613', '#ffffff'],
-  BHA: ['#0057b8', '#ffffff'], BUR: ['#6c1d45', '#99d6ea'], CHE: ['#034694', '#ffffff'], CRY: ['#1b458f', '#c4122e'],
-  EVE: ['#003399', '#ffffff'], FUL: ['#f5f5f5', '#111111'], IPS: ['#3a64a3', '#ffffff'], LEE: ['#f5f5f5', '#1d428a'],
+  BHA: ['#0057b8', '#ffffff'], BUR: ['#6c1d45', '#99d6ea'], CHE: ['#034694', '#ffffff'], COV: ['#6cc5e9', '#ffffff'], CRY: ['#1b458f', '#c4122e'],
+  EVE: ['#003399', '#ffffff'], FUL: ['#f5f5f5', '#111111'], HUL: ['#f5a12d', '#111111'], IPS: ['#3a64a3', '#ffffff'], LEE: ['#f5f5f5', '#1d428a'],
   LEI: ['#003090', '#fdbe11'], LIV: ['#c8102e', '#f6eb61'], LUT: ['#f78f1e', '#002d62'], MCI: ['#6cabdd', '#ffffff'],
   MUN: ['#da291c', '#111111'], NEW: ['#241f20', '#f5f5f5'], NFO: ['#dd0000', '#ffffff'], NOR: ['#fff200', '#00a650'],
   SHU: ['#ee2737', '#111111'], SOU: ['#d71920', '#ffffff'], SUN: ['#eb172b', '#ffffff'], TOT: ['#f5f5f5', '#132257'],

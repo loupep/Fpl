@@ -3,7 +3,7 @@
 // Response shapes follow the real API; the rules it enforces mirror the game's.
 
 import http from 'node:http';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 
 const CLUBS = [
   ['Ashford Town', 'ASH'], ['Bramley City', 'BRM'], ['Calder United', 'CAL'], ['Dunmore Rovers', 'DUN'],
@@ -19,6 +19,8 @@ const PRICE = { 1: [40, 60], 2: [40, 70], 3: [45, 135], 4: [45, 150] };
 const CURRENT_EVENT = 12;
 const ENTRY_ID = 4815;
 const CLIENT_ID = 'demo-client';
+const FPL_WEB_CLIENT_ID = 'bfcbaf69-aade-4c1b-8f00-c1cb8a193030'; // the real site's id, used by the in-app login
+const CLIENT_IDS = new Set([CLIENT_ID, FPL_WEB_CLIENT_ID]);
 
 function rng(seed) {
   return () => {
@@ -329,6 +331,7 @@ export function createMockFpl({ now = Date.now() } = {}) {
   // ----- auth (shaped like the PingOne refresh grant) -----
   const accessTokens = new Map();
   const refreshTokens = new Set();
+  const authCodes = new Map();
   const issue = (ttlS = 8 * 3600) => {
     const exp = Math.floor(Date.now() / 1000) + ttlS;
     const access = makeJwt({ sub: 'demo-user', exp, aud: CLIENT_ID });
@@ -399,10 +402,10 @@ export function createMockFpl({ now = Date.now() } = {}) {
       const active = state.chips.find((c) => c.status_for_entry === 'active');
       if (active && active !== chip) return fail('You can only play one chip each gameweek.');
       if (chip.status_for_entry !== 'available' && chip.status_for_entry !== 'active') return fail('That chip is not available.');
-      chip.status_for_entry = 'active';
+      Object.assign(chip, { status_for_entry: 'active', is_pending: true });
     } else {
       const active = state.chips.find((c) => c.status_for_entry === 'active' && c.chip_type === 'team');
-      if (active) active.status_for_entry = 'available';
+      if (active) Object.assign(active, { status_for_entry: 'available', is_pending: false });
     }
     const prev = new Map(state.picks.map((p) => [p.element, p]));
     state.picks = body.picks
@@ -427,7 +430,7 @@ export function createMockFpl({ now = Date.now() } = {}) {
     if (body?.entry !== ENTRY_ID) return fail('Entry does not match your team.');
     if (body?.event !== nextEvent) return fail(`Transfers are for gameweek ${nextEvent}.`);
     const list = body.transfers;
-    if (!Array.isArray(list) || list.length === 0) return fail('No transfers given.');
+    if (!Array.isArray(list) || (list.length === 0 && !body.chip)) return fail('No transfers given.');
     let chip = null;
     if (body.chip) {
       chip = state.chips.find((c) => c.name === body.chip && c.chip_type === 'transfer' && c.start_event <= nextEvent && c.stop_event >= nextEvent);
@@ -443,8 +446,8 @@ export function createMockFpl({ now = Date.now() } = {}) {
       if (!incoming) return fail('Unknown player.');
       if (working.some((p) => p.element === incoming.id)) return fail(`${incoming.web_name} is already in your squad.`);
       if (incoming.element_type !== typeOf(out.element)) return fail('Players must be swapped for the same position.');
-      if (t.purchase_price !== incoming.now_cost) return fail(`${incoming.web_name}'s price has changed.`);
-      if (t.selling_price !== out.selling_price) return fail('Selling price is out of date.');
+      if (t.purchase_price !== incoming.now_cost) return { status: 400, body: { transfers: [{ non_field_errors: [{ code: 'transfer_element_in_price_mismatch' }] }] } };
+      if (t.selling_price !== out.selling_price) return { status: 400, body: { transfers: [{ non_field_errors: [{ code: 'transfer_element_out_price_mismatch' }] }] } };
       bank += out.selling_price - incoming.now_cost;
       Object.assign(out, { element: incoming.id, purchase_price: incoming.now_cost, selling_price: incoming.now_cost, element_type: incoming.element_type });
     }
@@ -458,7 +461,7 @@ export function createMockFpl({ now = Date.now() } = {}) {
     state.picks = working;
     state.bank = bank;
     if (chip) {
-      chip.status_for_entry = 'active';
+      Object.assign(chip, { status_for_entry: 'active', is_pending: true });
       state.transfers = { ...state.transfers, limit: null, status: 'unlimited' };
     }
     state.transfers.made += list.length;
@@ -508,9 +511,36 @@ export function createMockFpl({ now = Date.now() } = {}) {
     if (p === '/as/.well-known/openid-configuration') {
       return json(200, { issuer: `${baseUrl}/as`, token_endpoint: `${baseUrl}/as/token` });
     }
+    // Sign-in page: pretends the user logged in and sends them back with a code.
+    if (p === '/as/authorize') {
+      const q = url.searchParams;
+      if (!CLIENT_IDS.has(q.get('client_id')) || q.get('response_type') !== 'code' || q.get('code_challenge_method') !== 'S256' || !q.get('code_challenge')) {
+        return json(400, { error: 'invalid_request' });
+      }
+      const code = randomBytes(16).toString('base64url');
+      authCodes.set(code, { challenge: q.get('code_challenge'), clientId: q.get('client_id'), redirectUri: q.get('redirect_uri') });
+      const back = new URL(q.get('redirect_uri'));
+      back.searchParams.set('code', code);
+      back.searchParams.set('state', q.get('state') ?? '');
+      res.writeHead(302, { Location: back.toString() });
+      res.end();
+      return;
+    }
     if (p === '/as/token' && req.method === 'POST') {
       const form = new URLSearchParams(await readBody());
-      if (form.get('grant_type') !== 'refresh_token' || form.get('client_id') !== CLIENT_ID) return json(400, { error: 'invalid_request' });
+      if (!CLIENT_IDS.has(form.get('client_id'))) return json(400, { error: 'invalid_client' });
+      if (form.get('grant_type') === 'authorization_code') {
+        const pending = authCodes.get(form.get('code'));
+        authCodes.delete(form.get('code'));
+        const verifierHash = createHash('sha256').update(form.get('code_verifier') ?? '').digest('base64url');
+        if (!pending || pending.clientId !== form.get('client_id') || pending.redirectUri !== form.get('redirect_uri') || pending.challenge !== verifierHash) {
+          return json(400, { error: 'invalid_grant', error_description: 'The authorization code is invalid.' });
+        }
+        const t = issue();
+        state.log.push({ type: 'login' });
+        return json(200, { access_token: t.access, refresh_token: t.refresh, id_token: 'x.y.z', token_type: 'Bearer', expires_in: 8 * 3600 });
+      }
+      if (form.get('grant_type') !== 'refresh_token') return json(400, { error: 'unsupported_grant_type' });
       const token = form.get('refresh_token');
       if (!refreshTokens.has(token)) return json(400, { error: 'invalid_grant', error_description: 'The refresh token is invalid or has been used.' });
       refreshTokens.delete(token); // rotate

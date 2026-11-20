@@ -3,7 +3,7 @@
 import * as api from './api.js';
 import { loadGameData, loadTeam } from './data.js';
 import { normalizePositions, sameLineup } from './rules.js';
-import { esc, num, countdown, deadlineText, toast, openModal, closeModal } from './ui.js';
+import { esc, num, countdown, deadlineText, toast, openModal, closeModal, confirmModal } from './ui.js';
 import * as connectView from './views/connect.js';
 import * as teamView from './views/team.js';
 import * as transfersView from './views/transfers.js';
@@ -149,8 +149,8 @@ async function onConnected(session) {
 }
 
 async function disconnect() {
-  if (dirty() && !window.confirm('You have unsaved changes. Disconnect anyway?')) return;
   closeModal();
+  if (dirty() && !(await confirmModal({ title: 'Unsaved changes', body: '<p>You have changes you haven\'t saved. Log out anyway?</p>', confirmLabel: 'Log out', danger: true }))) return;
   try {
     app.session = await api.disconnect();
   } catch (err) {
@@ -171,7 +171,7 @@ function openAccount() {
   const how = s.demo
     ? '<p class="note">Demo mode: a pretend league running on your computer. Nothing is sent to FPL.</p>'
     : s.mode === 'auth'
-      ? `<p>Logged in${s.name ? ` as <strong>${esc(s.name)}</strong>` : ''} · team ID ${esc(s.entry)}.</p>
+      ? `<p>Logged in${s.name ? ` as <strong>${esc(s.name)}</strong>` : ''} · team ID ${esc(s.entry)}.</p>${s.native ? '<p class="muted small">Your login is stored only on this phone.</p>' : ''}
          <p class="muted small">${s.canRefresh ? 'Your login renews itself automatically for about a month.' : `Your login lasts until about ${esc(expires ?? 'it expires')}. After that, paste a new one.`}</p>`
       : `<p>Viewing team ID <strong>${esc(s.entry)}</strong> without logging in. You can plan changes, but saving them needs a login.</p>`;
   openModal({
@@ -206,12 +206,37 @@ setInterval(() => {
   for (const node of document.querySelectorAll('[data-countdown]')) node.textContent = countdown(node.dataset.countdown);
 }, 20_000);
 
+// Android back button: close whatever is open before leaving the app.
+window.fplmBack = () => {
+  if (document.querySelector('.modal-backdrop')) { closeModal(); return true; }
+  if (app.lineup?.selected != null) { app.lineup.selected = null; render(); return true; }
+  if (app.transfer?.outId != null) { app.transfer.outId = null; render(); return true; }
+  if (app.session?.connected && app.status === 'ready' && app.view !== 'team') {
+    app.view = 'team';
+    pref.set('view', app.view);
+    render();
+    return true;
+  }
+  return false;
+};
+
 (async function start() {
   render();
   try {
+    if (api.isNative) {
+      // Finishes a login if Android restarted the app while it was open.
+      try {
+        const resumed = await api.resumeLogin();
+        if (resumed?.connected) toast('Logged in.', 'success');
+      } catch (err) {
+        toast(err.message, 'error', 8000);
+      }
+    }
     app.session = await api.getSession();
   } catch (err) {
-    $view.innerHTML = `<div class="empty-state"><h2>Can't reach the FPL Manager server</h2><p>${esc(err.message)}</p><p class="muted">Make sure <code>npm start</code> is still running, then reload this page.</p></div>`;
+    $view.innerHTML = api.isNative
+      ? `<div class="empty-state"><h2>Something went wrong starting the app</h2><p>${esc(err.message)}</p><p class="muted">Close the app and open it again.</p></div>`
+      : `<div class="empty-state"><h2>Can't reach the FPL Manager server</h2><p>${esc(err.message)}</p><p class="muted">Make sure <code>npm start</code> is still running, then reload this page.</p></div>`;
     return;
   }
   if (app.session.connected) await reload();

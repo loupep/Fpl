@@ -1,0 +1,63 @@
+plugins {
+    id 'com.android.application'
+}
+
+// The app's screens are the same web app the desktop version uses (../public),
+// copied into the APK at build time.
+def webAssetsDir = file('build/generated/webassets')
+def copyWebAssets = tasks.register('copyWebAssets', Sync) {
+    from rootProject.file('../public')
+    into new File(webAssetsDir, 'www')
+}
+
+android {
+    namespace 'io.github.loupep.fplmanager'
+    compileSdk 35
+    buildToolsVersion '35.0.0'
+
+    defaultConfig {
+        applicationId 'io.github.loupep.fplmanager'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    // Sign with one fixed key so a newer build installs over the old one and
+    // keeps your login. The key file is kept out of git (the repo is public);
+    // without it, builds use Android's standard debug key instead.
+    def keystore = file('fplmanager.keystore')
+    signingConfigs {
+        app {
+            storeFile keystore
+            storePassword 'fplmanager'
+            keyAlias 'fplmanager'
+            keyPassword 'fplmanager'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig keystore.exists() ? signingConfigs.app : signingConfigs.debug
+        }
+        debug {
+            if (keystore.exists()) signingConfig signingConfigs.app
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs += [webAssetsDir]
+        }
+    }
+}
+
+tasks.named('preBuild') {
+    dependsOn copyWebAssets
+}

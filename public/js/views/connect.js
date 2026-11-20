@@ -1,5 +1,6 @@
-// First-run screen: log in with a token copied from the FPL website, or just
-// enter a team ID to look around and plan.
+// First-run screen. In the Android app: log in on FPL's own login page inside
+// the app. On a computer: copy the login from the FPL website. Either way you
+// can instead enter a team ID to look around and plan.
 
 import * as api from '../api.js';
 import { esc, toast, busy } from '../ui.js';
@@ -19,17 +20,24 @@ export const SNIPPET = `(() => {
   return 'No FPL login found. Log in on this tab first, then run this again.';
 })()`;
 
-export function render(root, app, { onConnected }) {
-  const demo = app.session?.demo;
-  root.innerHTML = `
-    <section class="connect">
-      <div class="connect-intro">
-        <h1>Connect your FPL team</h1>
-        <p class="muted">Pick your team, set your captain and make transfers from here. Your login stays on this computer and is only ever sent to FPL.</p>
-        ${demo ? '<p class="note">Demo mode: use the <strong>Fill in demo login</strong> button. Nothing here touches the real FPL.</p>' : ''}
-      </div>
+function nativeLoginCard() {
+  return `
+        <div class="card connect-card">
+          <h2>Log in <span class="tag">to save changes</span></h2>
+          <p class="muted">Sign in with your Fantasy Premier League email and password on FPL's own login page. The app carries on by itself once you're in.</p>
+          <button type="button" class="btn btn-primary btn-big" data-action="native-login">Log in with FPL</button>
+          <details class="small muted">
+            <summary>Having trouble logging in?</summary>
+            <p>If you normally sign in with Google or Facebook, that won't work inside other apps. Use <em>Forgot password</em> on the login page to give your account a password, then log in with your email and that password.</p>
+            <p>If the login page doesn't bring you back here, try logging in through the FPL website instead:</p>
+            <p><button type="button" class="btn btn-small" data-action="site-login">Log in via the FPL website</button></p>
+            <p>Your login is stored only on this phone and renews itself for about a month.</p>
+          </details>
+        </div>`;
+}
 
-      <div class="connect-grid">
+function desktopLoginCard(demo) {
+  return `
         <form class="card connect-card" data-form="login">
           <h2>Log in <span class="tag">to save changes</span></h2>
           <ol class="steps">
@@ -52,7 +60,22 @@ export function render(root, app, { onConnected }) {
             <p>The login renews itself for about 30 days. Renewing can log you out of the FPL website in that browser; just log in there again if it does.</p>
             <p>You can also paste just an access token (the value after <code>Bearer</code> in the <code>x-api-authorization</code> header of any FPL request in the Network tab). Those last a few hours.</p>
           </details>
-        </form>
+        </form>`;
+}
+
+export function render(root, app, { onConnected }) {
+  const demo = app.session?.demo;
+  const native = api.isNative;
+  root.innerHTML = `
+    <section class="connect">
+      <div class="connect-intro">
+        <h1>Connect your FPL team</h1>
+        <p class="muted">Pick your team, set your captain and make transfers from here. Your login stays on this ${native ? 'phone' : 'computer'} and is only ever sent to FPL.</p>
+        ${demo ? '<p class="note">Demo mode: use the <strong>Fill in demo login</strong> button. Nothing here touches the real FPL.</p>' : ''}
+      </div>
+
+      <div class="connect-grid">
+        ${native ? nativeLoginCard() : desktopLoginCard(demo)}
 
         <form class="card connect-card" data-form="public">
           <h2>Just look and plan <span class="tag tag-muted">no login</span></h2>
@@ -78,6 +101,21 @@ export function render(root, app, { onConnected }) {
     }
   };
 
+  const nativeLogin = async (button, how) => {
+    busy(button, true);
+    try {
+      const session = await (how === 'site' ? api.loginViaWebsite() : api.login());
+      if (session?.connected) {
+        toast(`Logged in${session.name ? ` as ${session.name}` : ''}.`, 'success');
+        await onConnected(session);
+      }
+    } catch (err) {
+      toast(err.message, 'error', 8000);
+    } finally {
+      busy(button, false);
+    }
+  };
+
   root.onsubmit = (e) => {
     e.preventDefault();
     const form = e.target;
@@ -95,6 +133,10 @@ export function render(root, app, { onConnected }) {
 
   root.onclick = async (e) => {
     const action = e.target.closest('[data-action]')?.dataset.action;
+    if (action === 'native-login' || action === 'site-login') {
+      nativeLogin(e.target.closest('button'), action === 'site-login' ? 'site' : 'oauth');
+      return;
+    }
     if (action === 'copy') {
       try {
         await navigator.clipboard.writeText(SNIPPET);

@@ -140,7 +140,7 @@ export function render(root, app) {
             <div class="action-msg">${summary.errors.length ? `<span class="text-bad">${esc(summary.errors[0])}</span>` : transfer.pending.length ? `<span>${transfer.pending.length} transfer${transfer.pending.length > 1 ? 's' : ''} planned${summary.pointsCost ? `, costing ${summary.pointsCost} points` : ''}.</span>` : '<span class="muted">No transfers planned.</span>'}</div>
             <div class="row-gap">
               <button class="btn" data-action="reset" ${transfer.pending.length || transfer.chip || transfer.outId != null ? '' : 'disabled'}>Reset</button>
-              <button class="btn btn-primary" data-action="confirm" ${transfer.pending.length && summary.ok && team.editable ? '' : 'disabled'} ${team.editable ? '' : 'title="Log in to make transfers"'}>Make transfers</button>
+              <button class="btn btn-primary" data-action="confirm" ${(transfer.pending.length || transfer.chip) && summary.ok && team.editable ? '' : 'disabled'} ${team.editable ? '' : 'title="Log in to make transfers"'}>${!transfer.pending.length && transfer.chip ? `Play ${esc(TRANSFER_CHIPS[transfer.chip])}` : 'Make transfers'}</button>
             </div>
           </div>
         </div>
@@ -368,7 +368,14 @@ async function confirmTransfers(app, button) {
   if (!ctx.summary.ok) { toast(ctx.summary.errors[0], 'error'); return; }
   const rows = transfer.pending.map((t) => `<tr><td>${esc(d.elements.get(t.element_out)?.web_name)} <span class="muted">${esc(money(t.selling_price))}</span></td><td aria-hidden="true">→</td><td><strong>${esc(d.elements.get(t.element_in)?.web_name)}</strong> <span class="muted">${esc(money(t.purchase_price))}</span></td></tr>`).join('');
   const lineupDirty = !sameLineup(lineup.picks, lineup.original) || lineup.chip !== lineup.originalChip;
-  const ok = await confirmModal({
+  const chipOnly = !transfer.pending.length && transfer.chip;
+  const chipName = TRANSFER_CHIPS[transfer.chip];
+  const ok = chipOnly ? await confirmModal({
+    title: `Play ${chipName} now?`,
+    body: `<p>Every transfer you make for ${esc(d.next.name)} will then be free. You can make them now or any time before the deadline.</p>
+      <p class="muted small">${lineupDirty ? 'Your unsaved Pick Team changes will be cleared, so save them first if you want to keep them.' : ''}</p>`,
+    confirmLabel: `Play ${chipName}`,
+  }) : await confirmModal({
     title: 'Confirm transfers',
     body: `<table class="confirm-table">${rows}</table>
       <div class="stat-strip stat-strip-small">
@@ -385,7 +392,7 @@ async function confirmTransfers(app, button) {
     await api.makeTransfers(transfersPayload({ entry: session.entry, event: d.next.id, pending: transfer.pending, chip: transfer.chip }));
     const count = transfer.pending.length;
     await app.reload();
-    toast(`${count} transfer${count > 1 ? 's' : ''} made.`, 'success');
+    toast(chipOnly ? `${chipName} played.` : `${count} transfer${count > 1 ? 's' : ''} made${transfer.chip ? ` with your ${chipName}` : ''}.`, 'success');
   } catch (err) {
     toast(err.message, 'error', 9000);
     busy(button, false);

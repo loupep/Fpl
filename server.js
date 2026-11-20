@@ -16,7 +16,6 @@ const PUBLIC_DIR = path.join(ROOT, 'public');
 const DEMO = process.argv.includes('--demo') || process.env.FPL_DEMO === '1';
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? '127.0.0.1';
-const LONG_CACHE_MS = 5 * 60_000;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -27,16 +26,6 @@ const MIME = {
   '.ico': 'image/x-icon',
   '.json': 'application/json; charset=utf-8',
 };
-
-// Public data that changes slowly is cached briefly so the app stays quick.
-const CACHE_RULES = [
-  [/^\/api\/bootstrap-static\/$/, LONG_CACHE_MS],
-  [/^\/api\/fixtures\/$/, LONG_CACHE_MS],
-  [/^\/api\/element-summary\/\d+\/$/, LONG_CACHE_MS],
-  [/^\/api\/event\/\d+\/live\/$/, 30_000],
-];
-const AUTH_GET = [/^\/api\/me\/$/, /^\/api\/my-team\/\d+\/$/, /^\/api\/entry\/\d+\/transfers-latest\/$/];
-const ALLOWED_POST = [/^\/api\/my-team\/\d+\/$/, /^\/api\/transfers\/$/];
 
 let client;
 let demoInfo = null;
@@ -143,24 +132,9 @@ async function handleApi(req, res, url) {
   }
 
   if (pathname.startsWith('/api/fpl/')) {
-    const upstream = `/api/${pathname.slice('/api/fpl/'.length)}`;
-    if (!/^\/api\/[a-z0-9\-/]+\/$/i.test(upstream) || upstream.includes('//')) {
-      return send(res, 400, { error: 'Unsupported FPL path.' });
-    }
-    const query = /^\?[\w=&%-]{0,100}$/.test(search) ? search : '';
-    if (req.method === 'GET') {
-      const cacheMs = CACHE_RULES.find(([re]) => re.test(upstream))?.[1] ?? 0;
-      const auth = AUTH_GET.some((re) => re.test(upstream));
-      if (auth && client.session?.kind !== 'auth') return send(res, 401, { error: 'Log in to FPL to see this.' });
-      const data = await client.request('GET', upstream + query, { auth, cacheMs });
-      return send(res, 200, data);
-    }
-    if (req.method === 'POST' && ALLOWED_POST.some((re) => re.test(upstream))) {
-      if (client.session?.kind !== 'auth') return send(res, 401, { error: 'Log in to FPL before saving changes.' });
-      const body = await readJson(req);
-      const data = await client.request('POST', upstream, { body });
-      return send(res, 200, data ?? { ok: true });
-    }
+    const appPath = pathname.slice('/api/fpl/'.length) + search;
+    if (req.method === 'GET') return send(res, 200, await client.appGet(appPath));
+    if (req.method === 'POST') return send(res, 200, await client.appPost(appPath, await readJson(req)));
     return send(res, 405, { error: 'Method not allowed' });
   }
 
