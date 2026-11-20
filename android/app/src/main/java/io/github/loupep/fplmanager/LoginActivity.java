@@ -15,6 +15,7 @@ import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebStorage;
 import android.webkit.WebView;
@@ -25,6 +26,9 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import org.json.JSONObject;
+
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import org.json.JSONTokener;
 
 /**
@@ -98,18 +102,18 @@ public class LoginActivity extends Activity {
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(dp(16), dp(8), dp(8), dp(8));
         TextView title = new TextView(this);
-        title.setText("Log in to FPL");
+        title.setText(R.string.login_title);
         title.setTextColor(Color.WHITE);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         bar.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
         Button cancel = new Button(this);
-        cancel.setText("Cancel");
+        cancel.setText(R.string.login_cancel);
         cancel.setOnClickListener(v -> cancel());
         bar.addView(cancel);
         root.addView(bar);
 
         TextView hint = new TextView(this);
-        hint.setText("Sign in with your FPL email and password. You'll go back to FPL Manager by yourself once you're in.");
+        hint.setText(R.string.login_hint);
         hint.setTextColor(Color.parseColor("#94a3b2"));
         hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         hint.setPadding(dp(16), 0, dp(16), dp(8));
@@ -150,6 +154,24 @@ public class LoginActivity extends Activity {
                 if (finishIfSentBack(url)) view.stopLoading();
             }
 
+            // Backstops for redirects that skip shouldOverrideUrlLoading (for
+            // example, the end of a form submission): catch the page request itself.
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                if (request.isForMainFrame() && isSentBack(request.getUrl().toString())) {
+                    String url = request.getUrl().toString();
+                    handler.post(() -> finishIfSentBack(url));
+                    return new WebResourceResponse("text/html", "utf-8",
+                            new ByteArrayInputStream("<!doctype html><title>Logging in</title>".getBytes(StandardCharsets.UTF_8)));
+                }
+                return null;
+            }
+
+            @Override
+            public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
+                finishIfSentBack(url);
+            }
+
             @Override
             public void onPageFinished(WebView view, String url) {
                 captureSiteLogin();
@@ -165,10 +187,14 @@ public class LoginActivity extends Activity {
     }
 
     // "oauth": the login page is sending the user back to the FPL site with a code (or an error).
-    private boolean finishIfSentBack(String url) {
-        if (done || !"oauth".equals(mode) || redirect.isEmpty() || url == null || !url.startsWith(redirect)) return false;
+    private boolean isSentBack(String url) {
+        if (!"oauth".equals(mode) || redirect.isEmpty() || url == null || !url.startsWith(redirect)) return false;
         Uri u = Uri.parse(url);
-        if (u.getQueryParameter("code") == null && u.getQueryParameter("error") == null) return false;
+        return u.getQueryParameter("code") != null || u.getQueryParameter("error") != null;
+    }
+
+    private boolean finishIfSentBack(String url) {
+        if (done || !isSentBack(url)) return false;
         try {
             finishWith(new JSONObject().put("url", url).toString());
         } catch (Exception e) {

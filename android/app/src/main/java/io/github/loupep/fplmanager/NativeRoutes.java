@@ -1,5 +1,6 @@
 package io.github.loupep.fplmanager;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.Uri;
@@ -65,6 +66,9 @@ final class NativeRoutes {
 
     // ------------------------------------------------------------ login storage
 
+    // commit() rather than apply(): the login rotates on every renewal, so it
+    // must be on disk before the web app carries on. This runs off the UI thread.
+    @SuppressLint("ApplySharedPref")
     private WebResourceResponse session(WebResourceRequest request) {
         if ("GET".equals(request.getMethod())) {
             String stored = prefs.getString(SESSION_KEY, null);

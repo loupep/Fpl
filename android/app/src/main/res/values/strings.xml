@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">FPL Manager</string>
+    <string name="login_title">Log in to FPL</string>
+    <string name="login_cancel">Cancel</string>
+    <string name="login_hint">Sign in with your FPL email and password. You\'ll go back to FPL Manager by yourself once you\'re in.</string>
 </resources>
